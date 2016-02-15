@@ -31,7 +31,7 @@ BUILDDIR=$(BUILDROOT)
 DEPDIR=$(DEPROOT)
 
 #Final binary
-TARGET=result
+TARGET=mbent
 
 #The BUILDROOT folder is included for config.h
 CFLAGS = ${DEFAULT_CFLAGS} -I $(BUILDROOT) $(INCLUDE_FLAGS)
