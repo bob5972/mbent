@@ -56,8 +56,8 @@ $(DEPROOT)/%.dpp: $(SRCDIR)/%.cpp Makefile
 endif
 
 #No paths. VPATH is assumed
-C_SOURCES = 
-CPP_SOURCES = main.cpp
+C_SOURCES = main.c
+CPP_SOURCES = 
 
 #For reasons I cannot fathom, MBLIB_OBJ has to be last
 # or things don't link right...
