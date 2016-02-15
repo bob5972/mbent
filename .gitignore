@@ -2,4 +2,5 @@ build/
 config.mk
 local.mk
 gmon.out
-
+.project
+.cproject
