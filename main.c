@@ -134,7 +134,7 @@ void SimpleStats_Print(SimpleStats *s)
     expected = s->rangeSize;
     MBString_Copy(&prefix, &label);
     MBString_AppendCStr(&prefix, " Unique Count");
-    printf("%20s: %15.3f, %2.1f%% (random: %15.1f, 100%% )\n",
+    printf("%20s: %15.3f, %2.1f%% (random: %15.1f, 100%%)\n",
            MBString_GetCStr(&prefix), (float)s->uniqueEntries,
            percent, expected);
 
