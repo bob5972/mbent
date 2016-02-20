@@ -24,62 +24,111 @@
 #include "mbtypes.h"
 #include "mbassert.h"
 
-bool OverflowingAdd(double d, int64 c)
+typedef struct SimpleStats {
+    uint32 bitSize;
+    uint32 bitMask;
+    uint64 numData;
+    double average;
+    double sum;
+} SimpleStats;
+
+void SimpleStats_Init(SimpleStats *s, uint32 bitSize)
+{
+    Util_Zero(s, sizeof(*s));
+    s->bitSize = bitSize;
+    s->bitMask = (((uint64)1) << bitSize) - 1;
+    s->numData = 0;
+    s->average = 0;
+    s->sum = 0;
+}
+
+static bool OverflowingAdd(double d, int64 c)
 {
     ASSERT(c >= 0);
     return c > 0 && d + c <= d;
 }
 
-void PrintAverage(const char *label, double average, uint32 max)
+void SimpleStats_AddField(SimpleStats *s, uint32 field)
 {
-    double percent = (average / max) * 100;
-    double expected = (double)max / 2;
-    printf("%15s: %15.3f, %2.1f%% (random: %15.1f, 50%%)\n",
-           label, average, percent, expected);
+    ASSERT((field & s->bitMask) == field);
+    s->numData++;
+    ASSERT(!OverflowingAdd(s->sum, field));
+    s->sum += field;
+}
+void SimpleStats_Finish(SimpleStats *s)
+{
+    s->average = s->sum / s->numData;
 }
 
+void SimpleStats_Print(SimpleStats *s)
+{
+    uint32 max;
 
+    const char *label;
+    if (s->bitSize == 8) {
+        label = "Byte";
+        max = MAX_UINT8;
+    } else if (s->bitSize == 16) {
+        label = "Short";
+        max = MAX_UINT16;
+    } else {
+        ASSERT(s->bitSize == 32);
+        label = "DWord";
+        max = MAX_UINT32;
+    }
+
+    double percent = (s->average / max) * 100;
+    double expected = (double)max / 2;
+    printf("%15s: %15.3f, %2.1f%% (random: %15.1f, 50%%)\n",
+           label, s->average, percent, expected);
+}
 
 int main()
 {
     int c;
-    double byteAverage = 0;
-    uint64 byteCount = 0;
-    double shortAverage = 0;
+    uint8  curByte  = 0;
     uint16 curShort = 0;
-    double dwordAverage = 0;
     uint32 curDword = 0;
+    uint64 byteCount = 0;
+
+    SimpleStats byteStats;
+    SimpleStats shortStats;
+    SimpleStats dwordStats;
+
+    SimpleStats_Init(&byteStats,   8);
+    SimpleStats_Init(&shortStats, 16);
+    SimpleStats_Init(&dwordStats, 32);
 
     c = fgetc(stdin);
     while (c != EOF) {
         ASSERT(c >= 0 && c < 256);
-        ASSERT(!OverflowingAdd(byteAverage, c));
-        byteAverage += c;
-        byteCount++;
+
+        curByte = c;
+        SimpleStats_AddField(&byteStats, curByte);
 
         curShort <<= 8;
         curShort |= c;
         if (byteCount % 2 == 1) {
-            ASSERT(!OverflowingAdd(shortAverage, curShort));
-            shortAverage += curShort;
+            SimpleStats_AddField(&shortStats, curShort);
         }
 
         curDword <<= 8;
         curDword |= c;
         if (byteCount % 4 == 3) {
-            ASSERT(!OverflowingAdd(dwordAverage, curDword));
-            dwordAverage += curDword;
+            SimpleStats_AddField(&dwordStats, curDword);
         }
 
+        byteCount++;
         c = fgetc(stdin);
     }
 
-    byteAverage /= byteCount;
-    PrintAverage("Byte Average", byteAverage, MAX_UINT8);
-    shortAverage /= (byteCount / 2);
-    PrintAverage("Short Average", shortAverage, MAX_UINT16);
-    dwordAverage /= (byteCount / 4);
-    PrintAverage("DWord Average", dwordAverage, MAX_UINT32);
+    SimpleStats_Finish(&byteStats);
+    SimpleStats_Finish(&shortStats);
+    SimpleStats_Finish(&dwordStats);
+
+    SimpleStats_Print(&byteStats);
+    SimpleStats_Print(&shortStats);
+    SimpleStats_Print(&dwordStats);
 
     return 0;
 }
