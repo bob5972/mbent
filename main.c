@@ -51,8 +51,7 @@ void SimpleStats_Create(SimpleStats *s, uint32 bitSize)
     s->sum = 0;
     s->entropy = 0;
 
-    if (s->bitSize == 8 ||
-        s->bitSize == 16) {
+    if (s->bitSize == 8 || s->bitSize == 16) {
         uint32 byteSize = sizeof(s->entryCounts[0]);
         s->numEntryCounts = (((uint64)1) << bitSize);
         byteSize *= s->numEntryCounts;
@@ -126,6 +125,11 @@ void SimpleStats_Print(SimpleStats *s)
 
     double percent = (s->average / s->bitMask) * 100;
     double expected = (double)s->bitMask / 2;
+
+    MBString_Copy(&prefix, &label);
+    MBString_AppendCStr(&prefix, " Count");
+    printf("%15s: %lld\n",
+           MBString_GetCStr(&prefix), s->numEntries);
 
     MBString_Copy(&prefix, &label);
     MBString_AppendCStr(&prefix, " Average");
