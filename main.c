@@ -33,6 +33,7 @@ typedef struct SimpleStats {
     uint32 bitMask;
     uint64 rangeSize;
     uint64 numEntries;
+    uint64 uniqueEntries;
     double average;
     double sum;
 
@@ -74,26 +75,35 @@ void SimpleStats_AddField(SimpleStats *s, uint32 field)
     s->sum += field;
 
     VERIFY(s->numEntries < MAX_INT32);
+    if (IntMap_Get(&s->counts, field) == 0) {
+        s->uniqueEntries++;
+    }
     IntMap_IncrementBy(&s->counts, field, 1);
 }
 
 void SimpleStats_Finish(SimpleStats *s)
 {
-    uint64 i;
+    IntMapIterator it;
     s->average = s->sum / s->numEntries;
 
-    if (s->bitSize <= 16) {
-        for (i = 0; i < s->rangeSize; i++) {
-            double freq = IntMap_Get(&s->counts, i);
-            double entropy;
+    if (s->bitSize <= 32) {
+        IntMapIterator_Start(&it, &s->counts);
+        while (IntMapIterator_HasNext(&it)) {
+            uint32 key = IntMapIterator_GetNext(&it);
+
+            int count = IntMap_Get(&s->counts, key);
+            double freq, entropy;
+
+            freq = count;
             freq /= s->numEntries;
 
             if (freq > 0) {
                 entropy = -(freq * log2(freq));
                 s->entropy += entropy;
             }
+
+            s->hasEntropy = TRUE;
         }
-        s->hasEntropy = TRUE;
     }
 }
 
@@ -101,6 +111,7 @@ void SimpleStats_Print(SimpleStats *s)
 {
     MBString label;
     MBString prefix;
+    double percent, expected;
 
     MBString_Create(&label);
     MBString_Create(&prefix);
@@ -114,17 +125,24 @@ void SimpleStats_Print(SimpleStats *s)
         MBString_CopyCStr(&label, "DWord");
     }
 
-    double percent = (s->average / s->bitMask) * 100;
-    double expected = (double)s->bitMask / 2;
-
     MBString_Copy(&prefix, &label);
-    MBString_AppendCStr(&prefix, " Count");
-    printf("%15s: %lld\n",
+    MBString_AppendCStr(&prefix, " Total Count");
+    printf("%20s: %lld\n",
            MBString_GetCStr(&prefix), s->numEntries);
 
+    percent = (double)s->uniqueEntries / s->rangeSize * 100;
+    expected = s->rangeSize;
+    MBString_Copy(&prefix, &label);
+    MBString_AppendCStr(&prefix, " Unique Count");
+    printf("%20s: %15.3f, %2.1f%% (random: %15.1f, 100%% )\n",
+           MBString_GetCStr(&prefix), (float)s->uniqueEntries,
+           percent, expected);
+
+    percent = (s->average / s->bitMask) * 100;
+    expected = (double)s->bitMask / 2;
     MBString_Copy(&prefix, &label);
     MBString_AppendCStr(&prefix, " Average");
-    printf("%15s: %15.3f, %2.1f%% (random: %15.1f, 50%% )\n",
+    printf("%20s: %15.3f, %2.1f%% (random: %15.1f, 50%% )\n",
            MBString_GetCStr(&prefix), s->average, percent, expected);
 
     if (s->hasEntropy) {
@@ -133,8 +151,8 @@ void SimpleStats_Print(SimpleStats *s)
 
         percent = (s->entropy / s->bitSize) * 100;
         expected = s->bitSize;
-        printf("%15s: %15.3f, %2.1f%% (random: %15.1f, 100%%)\n",
-                   MBString_GetCStr(&prefix), s->entropy, percent, expected);
+        printf("%20s: %15.3f, %2.1f%% (random: %15.1f, 100%%)\n",
+                MBString_GetCStr(&prefix), s->entropy, percent, expected);
     }
 
     printf("\n");
