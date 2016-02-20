@@ -51,9 +51,10 @@ void SimpleStats_Create(SimpleStats *s, uint32 bitSize)
     s->sum = 0;
     s->entropy = 0;
 
-    if (s->bitSize == 8) {
+    if (s->bitSize == 8 ||
+        s->bitSize == 16) {
         uint32 byteSize = sizeof(s->entryCounts[0]);
-        s->numEntryCounts = 256;
+        s->numEntryCounts = (((uint64)1) << bitSize);
         byteSize *= s->numEntryCounts;
         s->entryCounts = malloc(byteSize);
         Util_Zero(s->entryCounts, byteSize);
