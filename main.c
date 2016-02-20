@@ -21,25 +21,49 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
 #include "mbtypes.h"
 #include "mbassert.h"
+#include "MBString.h"
 
 typedef struct SimpleStats {
     uint32 bitSize;
     uint32 bitMask;
-    uint64 numData;
+    uint32 maxField;
+    uint64 numEntries;
     double average;
     double sum;
+
+    bool hasEntropy;
+    double entropy;
+    uint32 numEntryCounts;
+    uint64 *entryCounts;
 } SimpleStats;
 
-void SimpleStats_Init(SimpleStats *s, uint32 bitSize)
+void SimpleStats_Create(SimpleStats *s, uint32 bitSize)
 {
     Util_Zero(s, sizeof(*s));
     s->bitSize = bitSize;
     s->bitMask = (((uint64)1) << bitSize) - 1;
-    s->numData = 0;
+    s->numEntries = 0;
     s->average = 0;
     s->sum = 0;
+    s->entropy = 0;
+
+    if (s->bitSize == 8) {
+        uint32 byteSize = sizeof(s->entryCounts[0]);
+        s->numEntryCounts = 256;
+        byteSize *= s->numEntryCounts;
+        s->entryCounts = malloc(byteSize);
+        Util_Zero(s->entryCounts, byteSize);
+    }
+
+}
+
+void SimpleStats_Destroy(SimpleStats *s)
+{
+    free(s->entryCounts);
 }
 
 static bool OverflowingAdd(double d, int64 c)
@@ -51,36 +75,76 @@ static bool OverflowingAdd(double d, int64 c)
 void SimpleStats_AddField(SimpleStats *s, uint32 field)
 {
     ASSERT((field & s->bitMask) == field);
-    s->numData++;
+    s->numEntries++;
     ASSERT(!OverflowingAdd(s->sum, field));
     s->sum += field;
+
+    if (s->entryCounts != NULL) {
+        ASSERT(field < s->numEntryCounts);
+        s->entryCounts[field]++;
+    }
+
+
 }
 void SimpleStats_Finish(SimpleStats *s)
 {
-    s->average = s->sum / s->numData;
+    uint32 i;
+    s->average = s->sum / s->numEntries;
+
+    if (s->entryCounts != NULL) {
+        for (i = 0; i < s->numEntryCounts; i++) {
+            double freq = s->entryCounts[i];
+            double entropy;
+            freq /= s->numEntries;
+
+            if (freq > 0) {
+                entropy = -(freq * log2(freq));
+                s->entropy += entropy;
+            }
+        }
+        s->hasEntropy = TRUE;
+    }
 }
 
 void SimpleStats_Print(SimpleStats *s)
 {
-    uint32 max;
+    MBString label;
+    MBString prefix;
 
-    const char *label;
+    MBString_Create(&label);
+    MBString_Create(&prefix);
+
     if (s->bitSize == 8) {
-        label = "Byte";
-        max = MAX_UINT8;
+        MBString_CopyCStr(&label, "Byte");
     } else if (s->bitSize == 16) {
-        label = "Short";
-        max = MAX_UINT16;
+        MBString_CopyCStr(&label, "Short");
     } else {
         ASSERT(s->bitSize == 32);
-        label = "DWord";
-        max = MAX_UINT32;
+        MBString_CopyCStr(&label, "DWord");
     }
 
-    double percent = (s->average / max) * 100;
-    double expected = (double)max / 2;
-    printf("%15s: %15.3f, %2.1f%% (random: %15.1f, 50%%)\n",
-           label, s->average, percent, expected);
+    double percent = (s->average / s->bitMask) * 100;
+    double expected = (double)s->bitMask / 2;
+
+    MBString_Copy(&prefix, &label);
+    MBString_AppendCStr(&prefix, " Average");
+    printf("%15s: %15.3f, %2.1f%% (random: %15.1f, 50%% )\n",
+           MBString_GetCStr(&prefix), s->average, percent, expected);
+
+    if (s->hasEntropy) {
+        MBString_Copy(&prefix, &label);
+        MBString_AppendCStr(&prefix, " Entropy");
+
+        percent = (s->entropy / s->bitSize) * 100;
+        expected = s->bitSize;
+        printf("%15s: %15.3f, %2.1f%% (random: %15.1f, 100%%)\n",
+                   MBString_GetCStr(&prefix), s->entropy, percent, expected);
+    }
+
+    printf("\n");
+
+    MBString_Destroy(&label);
+    MBString_Destroy(&prefix);
 }
 
 int main()
@@ -95,9 +159,9 @@ int main()
     SimpleStats shortStats;
     SimpleStats dwordStats;
 
-    SimpleStats_Init(&byteStats,   8);
-    SimpleStats_Init(&shortStats, 16);
-    SimpleStats_Init(&dwordStats, 32);
+    SimpleStats_Create(&byteStats,   8);
+    SimpleStats_Create(&shortStats, 16);
+    SimpleStats_Create(&dwordStats, 32);
 
     c = fgetc(stdin);
     while (c != EOF) {
@@ -129,6 +193,10 @@ int main()
     SimpleStats_Print(&byteStats);
     SimpleStats_Print(&shortStats);
     SimpleStats_Print(&dwordStats);
+
+    SimpleStats_Destroy(&byteStats);
+    SimpleStats_Destroy(&shortStats);
+    SimpleStats_Destroy(&dwordStats);
 
     return 0;
 }
