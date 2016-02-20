@@ -26,19 +26,19 @@
 #include "mbtypes.h"
 #include "mbassert.h"
 #include "MBString.h"
+#include "IntMap.h"
 
 typedef struct SimpleStats {
     uint32 bitSize;
     uint32 bitMask;
-    uint32 maxField;
+    uint64 rangeSize;
     uint64 numEntries;
     double average;
     double sum;
 
     bool hasEntropy;
     double entropy;
-    uint32 numEntryCounts;
-    uint64 *entryCounts;
+    IntMap counts;
 } SimpleStats;
 
 void SimpleStats_Create(SimpleStats *s, uint32 bitSize)
@@ -46,24 +46,18 @@ void SimpleStats_Create(SimpleStats *s, uint32 bitSize)
     Util_Zero(s, sizeof(*s));
     s->bitSize = bitSize;
     s->bitMask = (((uint64)1) << bitSize) - 1;
+    s->rangeSize = (((uint64)1) << bitSize);
     s->numEntries = 0;
     s->average = 0;
     s->sum = 0;
     s->entropy = 0;
 
-    if (s->bitSize == 8 || s->bitSize == 16) {
-        uint32 byteSize = sizeof(s->entryCounts[0]);
-        s->numEntryCounts = (((uint64)1) << bitSize);
-        byteSize *= s->numEntryCounts;
-        s->entryCounts = malloc(byteSize);
-        Util_Zero(s->entryCounts, byteSize);
-    }
-
+    IntMap_Create(&s->counts);
 }
 
 void SimpleStats_Destroy(SimpleStats *s)
 {
-    free(s->entryCounts);
+    IntMap_Destroy(&s->counts);
 }
 
 static bool OverflowingAdd(double d, int64 c)
@@ -79,21 +73,18 @@ void SimpleStats_AddField(SimpleStats *s, uint32 field)
     ASSERT(!OverflowingAdd(s->sum, field));
     s->sum += field;
 
-    if (s->entryCounts != NULL) {
-        ASSERT(field < s->numEntryCounts);
-        s->entryCounts[field]++;
-    }
-
-
+    VERIFY(s->numEntries < MAX_INT32);
+    IntMap_IncrementBy(&s->counts, field, 1);
 }
+
 void SimpleStats_Finish(SimpleStats *s)
 {
-    uint32 i;
+    uint64 i;
     s->average = s->sum / s->numEntries;
 
-    if (s->entryCounts != NULL) {
-        for (i = 0; i < s->numEntryCounts; i++) {
-            double freq = s->entryCounts[i];
+    if (s->bitSize <= 16) {
+        for (i = 0; i < s->rangeSize; i++) {
+            double freq = IntMap_Get(&s->counts, i);
             double entropy;
             freq /= s->numEntries;
 
