@@ -4,3 +4,4 @@ local.mk
 gmon.out
 .project
 .cproject
+zip/
