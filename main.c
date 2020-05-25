@@ -1,7 +1,7 @@
 /*
  * main.c -- part of mbent
  *
- * Copyright (c) 2016-2020 Michael Banack <bob5972@banack.net>
+ * Copyright (c) 2016-2020 Michael Banack <github@banack.net>
  *
  * MIT License
  * Permission is hereby granted, free of charge, to any person obtaining a copy
