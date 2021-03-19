@@ -115,6 +115,8 @@ void SimpleStats_Print(SimpleStats *s)
     MBString label;
     MBString prefix;
     double percent, expected;
+    double expectedPercent;
+    double randomUnique;
 
     MBString_Create(&label);
     MBString_Create(&prefix);
@@ -136,28 +138,46 @@ void SimpleStats_Print(SimpleStats *s)
            MBString_GetCStr(&prefix), s->numEntries);
 
     percent = (double)s->uniqueEntries / s->rangeSize * 100;
-    expected = s->rangeSize;
+
+    randomUnique = s->rangeSize;
+    if (s->numEntries < s->rangeSize) {
+        randomUnique = s->numEntries;
+    }
+    expected = randomUnique;
+    expectedPercent = 100.0 * expected / (double)s->rangeSize;
     MBString_Copy(&prefix, &label);
     MBString_AppendCStr(&prefix, " Unique Count");
-    printf("%20s: %15.3f, %5.1f%% (random: %15.1f, 100%%)\n",
+    printf("%20s: %15.3f, %5.1f%% (random: %15.1f, %5.1f%%)\n",
            MBString_GetCStr(&prefix), (float)s->uniqueEntries,
-           percent, expected);
+           percent, expected, expectedPercent);
 
     percent = (s->average / s->bitMask) * 100;
     expected = (double)s->bitMask / 2;
+    expectedPercent = 50.0;
     MBString_Copy(&prefix, &label);
     MBString_AppendCStr(&prefix, " Average");
-    printf("%20s: %15.3f, %5.1f%% (random: %15.1f,  50%%)\n",
-           MBString_GetCStr(&prefix), s->average, percent, expected);
+    printf("%20s: %15.3f, %5.1f%% (random: %15.1f, %5.1f%%)\n",
+           MBString_GetCStr(&prefix), s->average, percent, expected,
+                            expectedPercent);
 
     if (s->hasEntropy) {
         MBString_Copy(&prefix, &label);
         MBString_AppendCStr(&prefix, " Entropy");
 
-        percent = (s->entropy / s->bitSize) * 100;
-        expected = s->bitSize;
-        printf("%20s: %15.3f, %5.1f%% (random: %15.1f, 100%%)\n",
-                MBString_GetCStr(&prefix), s->entropy, percent, expected);
+        percent = (s->entropy / s->bitSize) * 100.0;
+
+        if (s->numEntries >= s->rangeSize) {
+            expected = s->bitSize;
+            expectedPercent = 100.0;
+        } else {
+            double freq = 1.0/s->numEntries;
+            expected = s->numEntries * (-freq) * log2(freq);
+            expectedPercent = 100.0 * expected / s->bitSize;
+        }
+
+        printf("%20s: %15.3f, %5.1f%% (random: %15.1f, %5.1f%%)\n",
+                MBString_GetCStr(&prefix), s->entropy, percent, expected,
+                                 expectedPercent);
     }
 
     printf("\n");
