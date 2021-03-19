@@ -176,8 +176,16 @@ void SimpleStats_Print(SimpleStats *s)
         }
 
         printf("%20s: %15.3f, %5.1f%% (random: %15.1f, %5.1f%%)\n",
-                MBString_GetCStr(&prefix), s->entropy, percent, expected,
-                                 expectedPercent);
+               MBString_GetCStr(&prefix), s->entropy, percent, expected,
+                                expectedPercent);
+
+        double compression = 1.0 - s->entropy / s->bitSize;
+        percent = compression * 100.0;
+
+        MBString_Copy(&prefix, &label);
+        MBString_AppendCStr(&prefix, " Compression");
+        printf("%20s: %15.3f, %5.1f%%\n",
+               MBString_GetCStr(&prefix), compression, percent);
     }
 
     printf("\n");
