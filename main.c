@@ -123,6 +123,8 @@ void SimpleStats_Print(SimpleStats *s)
         MBString_CopyCStr(&label, "Byte");
     } else if (s->bitSize == 16) {
         MBString_CopyCStr(&label, "Short");
+    } else if (s->bitSize == 24) {
+        MBString_CopyCStr(&label, "3Byte");
     } else {
         ASSERT(s->bitSize == 32);
         MBString_CopyCStr(&label, "DWord");
@@ -169,15 +171,18 @@ int main()
     int c;
     uint8  curByte  = 0;
     uint16 curShort = 0;
+    uint32 curThreeByte = 0;
     uint32 curDword = 0;
     uint64 byteCount = 0;
 
     SimpleStats byteStats;
     SimpleStats shortStats;
+    SimpleStats threeByteStats;
     SimpleStats dwordStats;
 
     SimpleStats_Create(&byteStats,   8);
     SimpleStats_Create(&shortStats, 16);
+    SimpleStats_Create(&threeByteStats, 24);
     SimpleStats_Create(&dwordStats, 32);
 
     c = fgetc(stdin);
@@ -193,6 +198,13 @@ int main()
             SimpleStats_AddField(&shortStats, curShort);
         }
 
+        curThreeByte <<= 8;
+        curThreeByte &= 0xFFFFFF;
+        curThreeByte |= c;
+        if (byteCount % 3 == 2) {
+            SimpleStats_AddField(&threeByteStats, curThreeByte);
+        }
+
         curDword <<= 8;
         curDword |= c;
         if (byteCount % 4 == 3) {
@@ -205,14 +217,17 @@ int main()
 
     SimpleStats_Finish(&byteStats);
     SimpleStats_Finish(&shortStats);
+    SimpleStats_Finish(&threeByteStats);
     SimpleStats_Finish(&dwordStats);
 
     SimpleStats_Print(&byteStats);
     SimpleStats_Print(&shortStats);
+    SimpleStats_Print(&threeByteStats);
     SimpleStats_Print(&dwordStats);
 
     SimpleStats_Destroy(&byteStats);
     SimpleStats_Destroy(&shortStats);
+    SimpleStats_Destroy(&threeByteStats);
     SimpleStats_Destroy(&dwordStats);
 
     return 0;
