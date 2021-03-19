@@ -145,7 +145,7 @@ void SimpleStats_Print(SimpleStats *s)
     expected = (double)s->bitMask / 2;
     MBString_Copy(&prefix, &label);
     MBString_AppendCStr(&prefix, " Average");
-    printf("%20s: %15.3f, %5.1f%% (random: %15.1f,  50%% )\n",
+    printf("%20s: %15.3f, %5.1f%% (random: %15.1f,  50%%)\n",
            MBString_GetCStr(&prefix), s->average, percent, expected);
 
     if (s->hasEntropy) {
